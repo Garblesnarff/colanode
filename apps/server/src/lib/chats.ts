@@ -14,7 +14,75 @@ import {
 } from '@colanode/server/types/chat';
 
 /**
+ * Chat Management System
+ * 
+ * This module provides the core functionality for managing chat sessions and messages
+ * in Colanode. It handles:
+ * - Creating and retrieving chat sessions
+ * - Sending messages and getting AI responses
+ * - Managing chat context and history
+ * 
+ * Integration with AI System:
+ * When a user sends a message, this module:
+ * 1. Stores the user's message in the database
+ * 2. Calls the AI assistant system (runAssistantResponseChain) to generate a response
+ * 3. Stores the AI response in the database
+ * 4. Returns both messages to the client
+ * 
+ * The chat service acts as the primary interface between user interactions and AI processing.
+ * It handles all data persistence for chat sessions and messages, ensuring that conversations
+ * are maintained across sessions and devices.
+ * 
+ * Data Flow:
+ * Client -> API Routes -> Chat Service -> AI Assistant -> LLM Providers -> Chat Service -> Database -> Client
+ * 
+ * Key Responsibilities:
+ * - Session Management: Create, retrieve, and update chat sessions
+ * - Message Processing: Handle user messages and AI responses
+ * - Context Management: Maintain and update chat context
+ * - Data Persistence: Store all chat data in the database
+ * - Error Handling: Gracefully handle AI processing errors
+ * 
+ * Data Flow Diagram:
+ * 
+ * ```text
+ * User Input
+ *     ↓
+ * [Chat Service] → [Database: Store User Message]
+ *     ↓
+ * [AI Assistant Chain] ←→ [Context Retrieval]
+ *     ↓                       ↑
+ * [LLM Providers] ←───────────┘
+ *     ↓
+ * [Database: Store AI Response]
+ *     ↓
+ * Response to Client
+ * ```
+ * 
+ * Component Interaction:
+ * 
+ * ```text
+ * Client
+ *    ↓ ↑
+ * API Routes
+ *    ↓ ↑
+ * Chat Service ◎─────────→ Database
+ *    ↓ ↑                    ↑ ↓
+ * AI Assistant ← Context Retrieval
+ *    ↓ ↑
+ * LLM Providers
+ * ```
+ */
+
+/**
  * Create a new chat session
+ * 
+ * This function creates a new chat session in the database with the provided configuration.
+ * If no provider configuration is provided, it defaults to OpenAI's gpt-4o-mini model.
+ * 
+ * @param input - Chat creation parameters including workspace ID, name, and context
+ * @param userId - ID of the user creating the chat
+ * @returns Promise resolving to the created chat session
  */
 export const createChat = async (
   input: ChatCreateInput,
@@ -49,6 +117,12 @@ export const createChat = async (
 
 /**
  * Get chat session by ID
+ * 
+ * Retrieves a chat session from the database by its ID and workspace ID.
+ * 
+ * @param chatId - ID of the chat session to retrieve
+ * @param workspaceId - ID of the workspace containing the chat
+ * @returns Promise resolving to the chat session or null if not found
  */
 export const getChatById = async (
   chatId: string,
@@ -66,6 +140,13 @@ export const getChatById = async (
 
 /**
  * List chats for a workspace
+ * 
+ * Retrieves all chat sessions in a workspace, ordered by most recently updated.
+ * 
+ * @param workspaceId - ID of the workspace
+ * @param userId - ID of the user requesting the list
+ * @param limit - Maximum number of chats to return (default: 50)
+ * @returns Promise resolving to an array of chat sessions
  */
 export const listChatsInWorkspace = async (
   workspaceId: string,
@@ -85,6 +166,16 @@ export const listChatsInWorkspace = async (
 
 /**
  * Send a message in a chat and get AI response
+ * 
+ * This is the core function for chat interactions. It:
+ * 1. Stores the user's message in the database
+ * 2. Expands the context with descendant nodes if needed
+ * 3. Calls the AI assistant system to generate a response
+ * 4. Stores the AI response in the database
+ * 5. Returns both messages to the client
+ * 
+ * @param input - Message sending parameters including chat ID, content, and context
+ * @returns Promise resolving to both the user and assistant messages
  */
 export const sendMessage = async (
   input: SendMessageInput
@@ -183,6 +274,13 @@ export const sendMessage = async (
 
 /**
  * Get chat message history
+ * 
+ * Retrieves message history for a chat session, optionally paginated.
+ * 
+ * @param chatId - ID of the chat session
+ * @param limit - Maximum number of messages to return (default: 50)
+ * @param before - Return messages before this message ID (for pagination)
+ * @returns Promise resolving to an array of chat messages
  */
 export const getChatMessages = async (
   chatId: string,
@@ -213,6 +311,13 @@ export const getChatMessages = async (
 
 /**
  * Update chat context
+ * 
+ * Updates the context node IDs associated with a chat session.
+ * 
+ * @param chatId - ID of the chat session to update
+ * @param contextNodeIds - Array of node IDs to use as context
+ * @param userId - ID of the user making the update
+ * @returns Promise resolving when the update is complete
  */
 export const updateChatContext = async (
   chatId: string,

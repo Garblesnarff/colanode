@@ -38,6 +38,65 @@ import {
   AssistantInput,
 } from '@colanode/server/types/assistant';
 
+/**
+ * AI Assistant Chain
+ * 
+ * This module implements the main AI assistant using LangChain's StateGraph.
+ * It orchestrates the entire process of:
+ * 1. Query rewriting for better context retrieval
+ * 2. Intent assessment to understand user needs
+ * 3. Context retrieval from nodes, documents, and databases
+ * 4. Document reranking for relevance
+ * 5. Response generation with citations
+ * 
+ * The assistant uses a state graph approach to process user queries:
+ * - State Management: Maintains conversation context and intermediate results
+ * - Parallel Processing: Some steps can be executed in parallel for efficiency
+ * - Conditional Logic: Different paths based on user intent and available context
+ * 
+ * Data Flow:
+ * User Input -> Query Rewriting -> Intent Assessment -> Context Retrieval -> 
+ * Document Reranking -> Response Generation -> Citation Extraction -> Final Output
+ * 
+ * Key Components:
+ * - Query Rewriter: Improves search queries for better context retrieval
+ * - Intent Classifier: Determines if the query requires context or is general knowledge
+ * - Context Retriever: Finds relevant nodes, documents, and database records
+ * - Document Reranker: Prioritizes context items by relevance
+ * - Response Generator: Creates the final AI response with context
+ * - Citation Extractor: Identifies source materials referenced in the response
+ * 
+ * Interaction with Chat Service:
+ * 
+ * The AI assistant is invoked by the chat service (chats.ts and chats-streaming.ts)
+ * when a user sends a message. The interaction flow is:
+ * 
+ * 1. Chat Service receives user message
+ * 2. Chat Service stores user message in database
+ * 3. Chat Service calls runAssistantResponseChain() with user input and context
+ * 4. AI Assistant processes the input through its state graph
+ * 5. AI Assistant returns final response and citations
+ * 6. Chat Service stores AI response in database
+ * 7. Chat Service returns both messages to client
+ * 
+ * Data Flow Diagram:
+ * 
+ * ```text
+ * [Chat Service]          [AI Assistant Chain]
+ *        │                        │
+ *        │  userInput, context    │
+ *        └────────────────────────→
+ *        │                        │
+ *        │  finalAnswer, citations│
+ *        ←────────────────────────┘
+ *        │                        │
+ * [Database]              [LLM Providers]
+ * ```
+ * 
+ * The assistant is designed to be stateless between calls, with all
+ * necessary context passed in through the input parameters.
+ */
+
 const generateRewrittenQuery = async (state: AssistantChainState) => {
   const rewrittenQuery = await rewriteQuery(state.userInput);
   return { rewrittenQuery };
@@ -198,162 +257,3 @@ const selectRelevantDocuments = async (state: AssistantChainState) => {
 const fetchWorkspaceDetails = async (workspaceId: string) => {
   return database
     .selectFrom('workspaces')
-    .where('id', '=', workspaceId)
-    .select(['name', 'id'])
-    .executeTakeFirst();
-};
-
-const generateResponse = async (state: AssistantChainState) => {
-  const workspace = await fetchWorkspaceDetails(state.workspaceId);
-  const formattedChatHistory = formatChatHistory(state.chatHistory);
-  const formattedContext = formatContextDocuments(state.topContext);
-
-  const result = await generateFinalAnswer({
-    currentTimestamp: new Date().toISOString(),
-    workspaceName: workspace?.name || state.workspaceId,
-    userName: state.userDetails.name,
-    userEmail: state.userDetails.email,
-    formattedChatHistory,
-    formattedMessages: '',
-    formattedDocuments: formattedContext,
-    question: state.userInput,
-  });
-
-  return { finalAnswer: result.answer, citations: result.citations };
-};
-
-const fetchDatabaseContext = async (state: AssistantChainState) => {
-  const databases = await database
-    .selectFrom('nodes as n')
-    .innerJoin('collaborations as c', 'c.node_id', 'n.root_id')
-    .where('n.type', '=', 'database')
-    .where('n.workspace_id', '=', state.workspaceId)
-    .where('c.collaborator_id', '=', state.userId)
-    .where('c.deleted_at', 'is', null)
-    .selectAll()
-    .execute();
-
-  const databaseContext: DatabaseContextItem[] = await Promise.all(
-    databases.map(async (db) => {
-      const dbNode = db as SelectNode;
-      const sampleRecords = await retrieveByFilters(
-        db.id,
-        state.workspaceId,
-        state.userId,
-        { filters: [], sorts: [], page: 1, count: 5 }
-      );
-      const dbAttrs = dbNode.attributes as DatabaseAttributes;
-      const fields = dbAttrs.fields || {};
-      const formattedFields = Object.entries(fields).reduce(
-        (acc, [id, field]) => ({
-          ...acc,
-          [id]: {
-            type: (field as { type: string; name: string }).type,
-            name: (field as { type: string; name: string }).name,
-          },
-        }),
-        {}
-      );
-
-      return {
-        id: db.id,
-        name: dbAttrs.name || 'Untitled Database',
-        fields: formattedFields,
-        sampleRecords,
-      };
-    })
-  );
-
-  return { databaseContext };
-};
-
-const generateDatabaseFilterAttributes = async (state: AssistantChainState) => {
-  if (state.intent === 'no_context' || !state.databaseContext.length) {
-    return {
-      databaseFilters: { shouldFilter: false, filters: [] } as DatabaseFilters,
-    };
-  }
-  const databaseFilters = await generateDatabaseFilters({
-    query: state.userInput,
-    databases: state.databaseContext,
-  });
-
-  return { databaseFilters };
-};
-
-const assistantResponseChain = new StateGraph(ResponseState)
-  .addNode('generateRewrittenQuery', generateRewrittenQuery)
-  .addNode('fetchContextDocuments', fetchContextDocuments)
-  .addNode('fetchChatHistory', fetchChatHistory)
-  .addNode('rerankContextDocuments', rerankContextDocuments)
-  .addNode('selectRelevantDocuments', selectRelevantDocuments)
-  .addNode('generateResponse', generateResponse)
-  .addNode('assessIntent', assessIntent)
-  .addNode('generateNoContextResponse', generateNoContextResponse)
-  .addNode('fetchDatabaseContext', fetchDatabaseContext)
-  .addNode('generateDatabaseFilterAttributes', generateDatabaseFilterAttributes)
-  .addEdge('__start__', 'fetchChatHistory')
-  .addEdge('fetchChatHistory', 'assessIntent')
-  .addConditionalEdges('assessIntent', (state) =>
-    state.intent === 'no_context'
-      ? 'generateNoContextResponse'
-      : 'generateRewrittenQuery'
-  )
-  .addEdge('generateRewrittenQuery', 'fetchContextDocuments')
-  .addEdge('fetchContextDocuments', 'rerankContextDocuments')
-  .addEdge('rerankContextDocuments', 'selectRelevantDocuments')
-  .addEdge('selectRelevantDocuments', 'generateResponse')
-  .addEdge('generateResponse', '__end__')
-  .addEdge('generateNoContextResponse', '__end__')
-  .compile();
-
-const langfuseCallback =
-  config.ai.enabled && config.ai.langfuse.enabled
-    ? new CallbackHandler({
-        publicKey: config.ai.langfuse.publicKey,
-        secretKey: config.ai.langfuse.secretKey,
-        baseUrl: config.ai.langfuse.baseUrl,
-      })
-    : undefined;
-
-const getFullContextNodeIds = async (
-  selectedIds: string[]
-): Promise<string[]> => {
-  const fullSet = new Set<string>();
-  for (const id of selectedIds) {
-    fullSet.add(id);
-    try {
-      const descendants = await fetchNodeDescendants(id);
-      descendants.forEach((descId) => fullSet.add(descId));
-    } catch (error) {
-      console.error(`Error fetching descendants for node ${id}:`, error);
-    }
-  }
-
-  return Array.from(fullSet);
-};
-
-export const runAssistantResponseChain = async (
-  input: AssistantInput
-): Promise<AssistantResponse> => {
-  let fullContextNodeIds: string[] = [];
-  if (input.selectedContextNodeIds && input.selectedContextNodeIds.length > 0) {
-    fullContextNodeIds = await getFullContextNodeIds(
-      input.selectedContextNodeIds
-    );
-  }
-
-  const chainInput = {
-    ...input,
-    selectedContextNodeIds: fullContextNodeIds,
-    intent: 'retrieve' as const,
-    databaseFilters: { shouldFilter: false, filters: [] },
-  };
-
-  const callbacks = langfuseCallback ? [langfuseCallback] : undefined;
-
-  const result = await assistantResponseChain.invoke(chainInput, {
-    callbacks,
-  });
-  return { finalAnswer: result.finalAnswer, citations: result.citations };
-};

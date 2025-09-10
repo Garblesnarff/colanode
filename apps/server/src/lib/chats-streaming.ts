@@ -9,7 +9,64 @@ import { socketService } from '@colanode/server/services/socket-service';
 import { SendMessageInput, ChatMessage, ProviderConfig } from '@colanode/server/types/chat';
 
 /**
+ * Streaming Chat Service
+ * 
+ * This module extends the basic chat functionality to support real-time streaming
+ * of AI responses. It's particularly useful for chat applications where users
+ * should see responses as they are being generated.
+ * 
+ * Relationship to Regular Chat Functions:
+ * This module works in conjunction with the regular chat functions in chats.ts.
+ * While chats.ts handles standard request/response interactions, this module
+ * provides real-time streaming capabilities for a more interactive user experience.
+ * 
+ * Key Differences from Regular Chat:
+ * 1. Real-time response streaming via WebSocket
+ * 2. Direct integration with streaming-capable LLM providers (like OpenRouter)
+ * 3. Immediate feedback to users as responses are generated
+ * 4. Callback-based architecture for handling response chunks
+ * 
+ * Integration Flow:
+ * 1. User sends message through WebSocket
+ * 2. User message is stored in database (same as regular chat)
+ * 3. If using streaming provider, stream response chunks to client
+ * 4. If using regular provider, generate full response and send to client
+ * 5. Assistant message is stored in database (same as regular chat)
+ * 
+ * Data Flow:
+ * Client -> WebSocket -> Chat Streaming Service -> AI Assistant/LLM -> 
+ * Streaming Response Chunks -> Client (real-time) -> 
+ * Complete Response -> Database Storage
+ */
+
+/**
  * Send a message with streaming AI response
+ * 
+ * This function handles sending messages with real-time streaming responses.
+ * It supports both streaming providers (like OpenRouter) and regular providers.
+ * 
+ * For streaming providers:
+ * - Streams response chunks directly to the client via callback
+ * - Stores the complete response in the database after streaming completes
+ * 
+ * For regular providers:
+ * - Generates the full response using the standard assistant chain
+ * - Sends the complete response to the client via callback
+ * 
+ * Relationship to chats.ts:
+ * This function parallels the sendMessage function in chats.ts but adds
+ * streaming capabilities. Both functions:
+ * - Store user messages in the database
+ * - Generate AI responses
+ * - Store assistant messages in the database
+ * - Return both user and assistant messages
+ * 
+ * The key difference is that this function can stream responses in real-time
+ * for supported providers, while chats.ts always returns complete responses.
+ * 
+ * @param input - Message sending parameters
+ * @param callback - Function to call with response chunks and completion status
+ * @returns Promise resolving to both the user and assistant messages
  */
 export const sendMessageWithStreaming = async (
   input: SendMessageInput,

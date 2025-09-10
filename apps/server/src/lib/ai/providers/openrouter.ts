@@ -3,6 +3,12 @@ import { BaseMessage, AIMessage, HumanMessage, SystemMessage } from '@langchain/
 import { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { Generation, LLMResult } from '@langchain/core/outputs';
 
+/**
+ * Configuration interface for OpenRouter LLM provider
+ * 
+ * This interface defines all the parameters needed to configure the OpenRouter integration,
+ * including authentication, model selection, and request parameters.
+ */
 export interface OpenRouterConfig {
   apiKey: string;
   model: string;
@@ -14,6 +20,19 @@ export interface OpenRouterConfig {
   baseUrl?: string;
 }
 
+/**
+ * OpenRouter LLM implementation for LangChain
+ * 
+ * This class provides an integration with OpenRouter, a unified API for various LLM providers.
+ * It supports both regular and streaming responses, making it suitable for chat applications
+ * that require real-time response generation.
+ * 
+ * Features:
+ * - Supports all OpenRouter models
+ * - Configurable parameters (temperature, maxTokens, topP)
+ * - Streaming responses for real-time chat
+ * - LangChain compatibility through BaseLLM inheritance
+ */
 export class OpenRouterLLM extends BaseLLM {
   private apiKey: string;
   private model: string;
@@ -24,6 +43,11 @@ export class OpenRouterLLM extends BaseLLM {
   private xTitle: string;
   private baseUrl: string;
 
+  /**
+   * Initialize the OpenRouter LLM with configuration
+   * 
+   * @param config - Configuration object containing API key, model, and other parameters
+   */
   constructor(config: OpenRouterConfig) {
     super({});
     this.apiKey = config.apiKey;
@@ -40,6 +64,17 @@ export class OpenRouterLLM extends BaseLLM {
     return 'openrouter';
   }
 
+  /**
+   * Generate text using the OpenRouter API
+   * 
+   * This method takes an array of messages and generates a response using the configured model.
+   * It handles error cases and formats the response appropriately.
+   * 
+   * @param messages - Array of message strings to send to the model
+   * @param options - Additional options for the LLM call
+   * @param runManager - Callback manager for tracking execution
+   * @returns Promise resolving to LLMResult with generated text
+   */
   async _generate(
     messages: string[],
     options?: this['ParsedCallOptions'],
@@ -76,6 +111,15 @@ export class OpenRouterLLM extends BaseLLM {
     return this._chatCompletion(messages);
   }
 
+  /**
+   * Make a chat completion request to OpenRouter API
+   * 
+   * This method handles the actual HTTP request to the OpenRouter API, including
+   * setting appropriate headers and handling the response.
+   * 
+   * @param messages - Array of messages in OpenAI format
+   * @returns Promise resolving to the generated text content
+   */
   async _chatCompletion(messages: Array<{ role: string; content: string }>): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -109,7 +153,15 @@ export class OpenRouterLLM extends BaseLLM {
     return data.choices[0].message.content;
   }
 
-  // Chat interface for LangChain compatibility
+  /**
+   * Invoke the LLM with LangChain message format
+   * 
+   * This method provides compatibility with LangChain's message interface,
+   * converting BaseMessage objects to the format expected by OpenRouter.
+   * 
+   * @param messages - Array of LangChain BaseMessage objects
+   * @returns Promise resolving to the generated text content
+   */
   async invoke(messages: BaseMessage[]): Promise<string> {
     const formattedMessages = messages.map((message) => {
       if (message instanceof HumanMessage) {
@@ -126,7 +178,17 @@ export class OpenRouterLLM extends BaseLLM {
     return this._chatCompletion(formattedMessages);
   }
 
-  // Stream support for real-time responses
+  /**
+   * Stream responses from the OpenRouter API
+   * 
+   * This generator function provides real-time streaming of LLM responses,
+   * yielding chunks of text as they are generated. This is particularly
+   * useful for chat applications where users should see responses as they
+   * are being generated.
+   * 
+   * @param messages - Array of LangChain BaseMessage objects
+   * @yields Promise<string> - Chunks of generated text
+   */
   async *stream(
     messages: BaseMessage[]
   ): AsyncGenerator<string, void, unknown> {
