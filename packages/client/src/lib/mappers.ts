@@ -49,8 +49,22 @@ import {
   WorkspaceMetadata,
   WorkspaceMetadataKey,
 } from '@colanode/client/types/workspaces';
-import { Mutation } from '@colanode/core';
+import { Mutation } from '@colanode/core'; // Assuming Mutation is from core, not client/mutations
 
+// packages/client/src/lib/mappers.ts
+/**
+ * @file Defines a collection of mapping functions.
+ * These functions are responsible for transforming data structures retrieved from the
+ * local Kysely database (typically `Select...` types) into the application's
+ * domain-specific TypeScript types (e.g., `User`, `Node`, `Document`).
+ * This helps decouple the database representation from the application logic.
+ */
+
+/**
+ * Maps a database row from the `users` table ({@link SelectUser}) to an application {@link User} object.
+ * @param row - The database row object for a user.
+ * @returns The corresponding `User` object.
+ */
 export const mapUser = (row: SelectUser): User => {
   return {
     id: row.id,
@@ -65,6 +79,15 @@ export const mapUser = (row: SelectUser): User => {
   };
 };
 
+/**
+ * Maps a database row from the `nodes` table ({@link SelectNode}) to an application {@link LocalNode} object.
+ * It parses the `attributes` field from a JSON string into an object.
+ *
+ * @param row - The database row object for a node.
+ * @returns The corresponding `LocalNode` object.
+ *          The `attributes` property will be a parsed object.
+ *          Type assertion `as LocalNode` is used, assuming the structure matches after parsing.
+ */
 export const mapNode = (row: SelectNode): LocalNode => {
   return {
     id: row.id,
@@ -78,12 +101,24 @@ export const mapNode = (row: SelectNode): LocalNode => {
     updatedBy: row.updated_by,
     localRevision: row.local_revision,
     serverRevision: row.server_revision,
-  } as LocalNode;
+  } as LocalNode; // Attributes JSON is parsed; result cast to LocalNode.
 };
 
+/**
+ * Maps a database row from the `documents` table ({@link SelectDocument}) to an application {@link Document} object.
+ * It parses the `content` field (which stores document structure as a JSON string) into an object.
+ *
+ * @param row - The database row object for a document.
+ * @returns The corresponding `Document` object with parsed content.
+ */
 export const mapDocument = (row: SelectDocument): Document => {
+  // The `type` field is missing in SelectDocument but present in the Document type (via DocumentContent).
+  // This implies that the `content` JSON string must contain the `type` discriminator.
+  // The Document type likely expects `content` to be a RichTextContent object.
+  const parsedContent = JSON.parse(row.content); // Assuming content is RichTextContent compatible
   return {
     id: row.id,
+// type: parsedContent.type, // This would be needed if Document type included 'type' directly
     localRevision: row.local_revision,
     serverRevision: row.server_revision,
     content: JSON.parse(row.content),
@@ -94,6 +129,14 @@ export const mapDocument = (row: SelectDocument): Document => {
   };
 };
 
+/**
+ * Maps a database row from the `document_states` table ({@link SelectDocumentState})
+ * to an application {@link DocumentState} object.
+ * This typically involves CRDT state vectors for document content.
+ *
+ * @param row - The database row object for a document's CRDT state.
+ * @returns The corresponding `DocumentState` object.
+ */
 export const mapDocumentState = (row: SelectDocumentState): DocumentState => {
   return {
     id: row.id,
@@ -102,9 +145,19 @@ export const mapDocumentState = (row: SelectDocumentState): DocumentState => {
   };
 };
 
+/**
+ * Maps a database row from the `document_updates` table ({@link SelectDocumentUpdate})
+ * to an application {@link DocumentUpdate} object.
+ * This represents a single CRDT update for a document.
+ *
+ * @param row - The database row object for a document update.
+ * @returns The corresponding `DocumentUpdate` object.
+ */
 export const mapDocumentUpdate = (
   row: SelectDocumentUpdate
 ): DocumentUpdate => {
+  // Assumes row.data is already in the correct format (e.g., Uint8Array if the type expects it)
+  // or that direct assignment is intended. Kysely handles Blob to Uint8Array.
   return {
     id: row.id,
     documentId: row.document_id,
@@ -112,6 +165,13 @@ export const mapDocumentUpdate = (
   };
 };
 
+/**
+ * Maps a database row from the `accounts` table ({@link SelectAccount})
+ * to an application {@link Account} object.
+ *
+ * @param row - The database row object for an account.
+ * @returns The corresponding `Account` object.
+ */
 export const mapAccount = (row: SelectAccount): Account => {
   return {
     id: row.id,
@@ -127,7 +187,18 @@ export const mapAccount = (row: SelectAccount): Account => {
   };
 };
 
+/**
+ * Maps a database row from a workspace selection query ({@link SelectWorkspace},
+ * which might be a join or a specific table for workspace list)
+ * to an application {@link Workspace} object.
+ *
+ * @param row - The database row object representing a workspace.
+ * @returns The corresponding `Workspace` object.
+ */
 export const mapWorkspace = (row: SelectWorkspace): Workspace => {
+  // Note: SelectWorkspace type comes from '@colanode/client/databases/account',
+  // which might imply it's related to the list of workspaces an account has access to,
+  // rather than the workspace's own dedicated DB schema.
   return {
     id: row.id,
     name: row.name,
@@ -141,6 +212,14 @@ export const mapWorkspace = (row: SelectWorkspace): Workspace => {
   };
 };
 
+/**
+ * Maps a database row from the `mutations` table ({@link SelectMutation})
+ * to an application {@link Mutation} object (from `@colanode/core`).
+ * It parses the `data` field from a JSON string into an object.
+ *
+ * @param row - The database row object for a queued mutation.
+ * @returns The corresponding `Mutation` object with parsed data.
+ */
 export const mapMutation = (row: SelectMutation): Mutation => {
   return {
     id: row.id,
@@ -150,6 +229,15 @@ export const mapMutation = (row: SelectMutation): Mutation => {
   };
 };
 
+/**
+ * Maps a database row from the `servers` table ({@link SelectServer})
+ * to an application {@link Server} object.
+ * It parses the `attributes` field from a JSON string and converts
+ * `created_at` and `synced_at` strings to Date objects.
+ *
+ * @param row - The database row object for a server.
+ * @returns The corresponding `Server` object.
+ */
 export const mapServer = (row: SelectServer): Server => {
   return {
     domain: row.domain,
@@ -162,6 +250,13 @@ export const mapServer = (row: SelectServer): Server => {
   };
 };
 
+/**
+ * Maps a database row from the `node_reactions` table ({@link SelectNodeReaction})
+ * to an application {@link NodeReaction} object.
+ *
+ * @param row - The database row object for a node reaction.
+ * @returns The corresponding `NodeReaction` object.
+ */
 export const mapNodeReaction = (row: SelectNodeReaction): NodeReaction => {
   return {
     nodeId: row.node_id,
@@ -172,6 +267,13 @@ export const mapNodeReaction = (row: SelectNodeReaction): NodeReaction => {
   };
 };
 
+/**
+ * Maps a database row from the `node_interactions` table ({@link SelectNodeInteraction})
+ * to an application {@link NodeInteraction} object.
+ *
+ * @param row - The database row object for a node interaction.
+ * @returns The corresponding `NodeInteraction` object.
+ */
 export const mapNodeInteraction = (
   row: SelectNodeInteraction
 ): NodeInteraction => {
@@ -187,6 +289,13 @@ export const mapNodeInteraction = (
   };
 };
 
+/**
+ * Maps a database row from the `file_states` table ({@link SelectFileState})
+ * to an application {@link FileState} object.
+ *
+ * @param row - The database row object for a file's state.
+ * @returns The corresponding `FileState` object.
+ */
 export const mapFileState = (row: SelectFileState): FileState => {
   return {
     id: row.id,
@@ -204,6 +313,14 @@ export const mapFileState = (row: SelectFileState): FileState => {
   };
 };
 
+/**
+ * Maps a database row from the `emojis` table ({@link SelectEmoji})
+ * to an application {@link Emoji} object.
+ * It parses `tags`, `emoticons`, and `skins` from JSON strings into arrays.
+ *
+ * @param row - The database row object for an emoji.
+ * @returns The corresponding `Emoji` object.
+ */
 export const mapEmoji = (row: SelectEmoji): Emoji => {
   return {
     id: row.id,
@@ -216,6 +333,14 @@ export const mapEmoji = (row: SelectEmoji): Emoji => {
   };
 };
 
+/**
+ * Maps a database row from the `icons` table ({@link SelectIcon})
+ * to an application {@link Icon} object.
+ * It parses `tags` from a JSON string into an array.
+ *
+ * @param row - The database row object for an icon.
+ * @returns The corresponding `Icon` object.
+ */
 export const mapIcon = (row: SelectIcon): Icon => {
   return {
     id: row.id,
@@ -226,9 +351,17 @@ export const mapIcon = (row: SelectIcon): Icon => {
   };
 };
 
+/**
+ * Maps a database row from the application `metadata` table ({@link SelectAppMetadata})
+ * to an application {@link AppMetadata} object.
+ * It parses the `value` field from a JSON string.
+ *
+ * @param row - The database row object for an app metadata item.
+ * @returns The corresponding `AppMetadata` object with parsed value.
+ */
 export const mapAppMetadata = (row: SelectAppMetadata): AppMetadata => {
   return {
-    key: row.key as AppMetadataKey,
+    key: row.key as AppMetadataKey, // Assumes row.key is a valid AppMetadataKey
     value: JSON.parse(row.value),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -239,7 +372,7 @@ export const mapAccountMetadata = (
   row: SelectAccountMetadata
 ): AccountMetadata => {
   return {
-    key: row.key as AccountMetadataKey,
+    key: row.key as AccountMetadataKey, // Assumes row.key is a valid AccountMetadataKey
     value: JSON.parse(row.value),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -250,18 +383,28 @@ export const mapWorkspaceMetadata = (
   row: SelectWorkspaceMetadata
 ): WorkspaceMetadata => {
   return {
-    key: row.key as WorkspaceMetadataKey,
+    key: row.key as WorkspaceMetadataKey, // Assumes row.key is a valid WorkspaceMetadataKey
     value: JSON.parse(row.value),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 };
 
+/**
+ * Maps a database row from the `node_references` table ({@link SelectNodeReference})
+ * to an application {@link NodeReference} object.
+ *
+ * @param row - The database row object for a node reference.
+ * @returns The corresponding `NodeReference` object.
+ */
 export const mapNodeReference = (row: SelectNodeReference): NodeReference => {
   return {
     nodeId: row.node_id,
     referenceId: row.reference_id,
     innerId: row.inner_id,
     type: row.type,
+    // Note: created_at and created_by are in SelectNodeReference but not in NodeReference type in this file.
+    // If they should be part of NodeReference, the type definition needs an update.
+    // For now, mapping only the fields present in the current NodeReference type.
   };
 };

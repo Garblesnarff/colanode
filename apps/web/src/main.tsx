@@ -1,3 +1,17 @@
+// apps/web/src/main.tsx
+/**
+ * @file Entry point for the Colanode web application.
+ *
+ * This file is responsible for:
+ * - Initializing the React application.
+ * - Setting up the main communication bridge with the dedicated web worker (`DedicatedWorker`).
+ *   It uses Comlink to expose worker functionalities to the main thread.
+ * - Checking for browser compatibility (e.g., OPFS support).
+ * - Rendering the root React component (`Root`) or a compatibility notice.
+ * - Exposing client-side API functions (e.g., `executeMutation`, `executeQuery`) globally
+ *   on the `window.colanode` object, which internally delegate to the web worker.
+ * - Subscribing to events from the worker and publishing them to a local event bus.
+ */
 import * as Comlink from 'comlink';
 import { createRoot } from 'react-dom/client';
 

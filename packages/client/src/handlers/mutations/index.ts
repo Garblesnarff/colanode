@@ -1,5 +1,13 @@
-import { MutationHandler } from '@colanode/client/lib';
-import { MutationMap } from '@colanode/client/mutations';
+// packages/client/src/handlers/mutations/index.ts
+/**
+ * @file Defines and exports a map of mutation handlers.
+ * This file serves as a central registry for all mutation handling logic within the client.
+ * It imports individual mutation handler classes and instantiates them in the
+ * `buildMutationHandlerMap` function, which is then used by the `Mediator` to dispatch
+ * mutation requests.
+ */
+import { MutationHandler } from '@colanode/client/lib/types'; // Corrected import path
+import { MutationMap, MutationInput } from '@colanode/client/mutations'; // Assuming MutationInput is also from here
 import { AppService } from '@colanode/client/services';
 
 import { AccountLogoutMutationHandler } from './accounts/account-logout';
@@ -73,13 +81,40 @@ import { WorkspaceMetadataDeleteMutationHandler } from './workspaces/workspace-m
 import { WorkspaceMetadataUpdateMutationHandler } from './workspaces/workspace-metadata-update';
 import { WorkspaceUpdateMutationHandler } from './workspaces/workspace-update';
 
+/**
+ * Defines the structure of the map that holds all mutation handlers.
+ * It's a mapped type where keys are mutation type strings (from `MutationMap`),
+ * and values are {@link MutationHandler} instances typed for the specific
+ * mutation input associated with that key in `MutationMap`.
+ *
+ * `MutationMap[K]['input']` dynamically gets the input type for mutation `K`.
+ */
 export type MutationHandlerMap = {
+  // Ensures that each handler in the map is correctly typed for the specific mutation it handles.
+  // For each key K (which is a mutation type string like 'email.login') in MutationMap,
+  // the value is a MutationHandler that expects an input of type MutationMap[K]['input'].
   [K in keyof MutationMap]: MutationHandler<MutationMap[K]['input']>;
 };
 
+/**
+ * Constructs and returns the `MutationHandlerMap`.
+ * This function instantiates all known mutation handlers, passing the `AppService`
+ * instance to their constructors for dependency injection. The resulting map is
+ * used by the `Mediator` to dispatch mutation execution requests.
+ *
+ * Each key in the returned map is a string literal identifying a specific mutation type
+ * (e.g., 'email.login', 'channel.create'), and the value is an instance of the
+ * corresponding handler class.
+ *
+ * @param app - The main {@link AppService} instance, providing dependencies to handlers.
+ * @returns A `MutationHandlerMap` containing instances of all mutation handlers.
+ */
 export const buildMutationHandlerMap = (
   app: AppService
 ): MutationHandlerMap => {
+  // The object returned here must conform to MutationHandlerMap.
+  // TypeScript will check if each property (e.g., 'email.login') is assigned a handler
+  // that correctly implements MutationHandler for the corresponding input type.
   return {
     'email.login': new EmailLoginMutationHandler(app),
     'email.register': new EmailRegisterMutationHandler(app),

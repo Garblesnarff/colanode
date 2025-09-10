@@ -1,5 +1,13 @@
+// packages/client/src/handlers/queries/index.ts
+/**
+ * @file Defines and exports a map of query handlers.
+ * This file serves as a central registry for all query handling logic within the client.
+ * It imports individual query handler classes and instantiates them in the
+ * `buildQueryHandlerMap` function, which is then used by the `Mediator` to dispatch
+ * query requests and manage query subscriptions.
+ */
 import { QueryHandler } from '@colanode/client/lib/types';
-import { QueryMap } from '@colanode/client/queries';
+import { QueryMap, QueryInput } from '@colanode/client/queries'; // Assuming QueryInput is also from here
 import { AppService } from '@colanode/client/services/app-service';
 
 import { AccountGetQueryHandler } from './accounts/account-get';
@@ -42,11 +50,38 @@ import { WorkspaceGetQueryHandler } from './workspaces/workspace-get';
 import { WorkspaceListQueryHandler } from './workspaces/workspace-list';
 import { WorkspaceMetadataListQueryHandler } from './workspaces/workspace-metadata-list';
 
+/**
+ * Defines the structure of the map that holds all query handlers.
+ * It's a mapped type where keys are query type strings (from `QueryMap`),
+ * and values are {@link QueryHandler} instances typed for the specific
+ * query input associated with that key in `QueryMap`.
+ *
+ * `QueryMap[K]['input']` dynamically gets the input type for query `K`.
+ */
 export type QueryHandlerMap = {
+  // Ensures that each handler in the map is correctly typed for the specific query it handles.
+  // For each key K (which is a query type string like 'account.list') in QueryMap,
+  // the value is a QueryHandler that expects an input of type QueryMap[K]['input'].
   [K in keyof QueryMap]: QueryHandler<QueryMap[K]['input']>;
 };
 
+/**
+ * Constructs and returns the `QueryHandlerMap`.
+ * This function instantiates all known query handlers, passing the `AppService`
+ * instance to their constructors for dependency injection. The resulting map is
+ * used by the `Mediator` to dispatch query execution requests and manage subscriptions.
+ *
+ * Each key in the returned map is a string literal identifying a specific query type
+ * (e.g., 'account.list', 'node.get'), and the value is an instance of the
+ * corresponding handler class.
+ *
+ * @param app - The main {@link AppService} instance, providing dependencies to handlers.
+ * @returns A `QueryHandlerMap` containing instances of all query handlers.
+ */
 export const buildQueryHandlerMap = (app: AppService): QueryHandlerMap => {
+  // The object returned here must conform to QueryHandlerMap.
+  // TypeScript will check if each property (e.g., 'account.list') is assigned a handler
+  // that correctly implements QueryHandler for the corresponding input type.
   return {
     'app.metadata.list': new AppMetadataListQueryHandler(app),
     'avatar.url.get': new AvatarUrlGetQueryHandler(app),

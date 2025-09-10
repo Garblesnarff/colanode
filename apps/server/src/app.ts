@@ -1,3 +1,15 @@
+// apps/server/src/app.ts
+/**
+ * @file Main application setup for the Colanode server.
+ *
+ * This file initializes and configures the Fastify server instance.
+ * Responsibilities include:
+ * - Setting up Fastify with necessary plugins (e.g., WebSocket, CORS, error handling).
+ * - Registering API routes defined in `apps/server/src/api`.
+ * - Configuring serializers and validators (using Zod for type-safe schemas).
+ * - Starting the HTTP server and listening on the configured port and host.
+ * - Handling basic server lifecycle events (startup, error handling).
+ */
 import fastifyWebsocket from '@fastify/websocket';
 import { fastify } from 'fastify';
 import {

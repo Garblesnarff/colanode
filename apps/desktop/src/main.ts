@@ -1,3 +1,16 @@
+// apps/desktop/src/main.ts
+/**
+ * @file Main process entry point for the Colanode Electron desktop application.
+ *
+ * This file is responsible for:
+ * - Initializing the Electron application.
+ * - Creating and managing browser windows.
+ * - Handling Inter-Process Communication (IPC) with renderer processes.
+ * - Setting up application-level event listeners (e.g., for updates, window lifecycle).
+ * - Registering global shortcuts.
+ * - Managing application services and protocols.
+ * - Integrating with `@colanode/client` for backend communication and data operations.
+ */
 import {
   app as electronApp,
   BrowserWindow,
