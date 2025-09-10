@@ -305,6 +305,59 @@ interface CounterTable {
   updated_at: ColumnType<Date | null, Date | null, Date | null>;
 }
 
+interface ChatTable {
+  id: ColumnType<string, string, never>;
+  workspace_id: ColumnType<string, string, never>;
+  name: ColumnType<string, string, string>;
+  context_node_ids: JSONColumnType<string[], string[], string[]>;
+  provider_config: JSONColumnType<
+    {
+      provider: string;
+      model: string;
+      temperature?: number;
+      maxTokens?: number;
+      topP?: number;
+    },
+    string,
+    string
+  >;
+  created_at: ColumnType<Date, Date, never>;
+  created_by: ColumnType<string, string, never>;
+  updated_at: ColumnType<Date | null, Date | null, Date>;
+  updated_by: ColumnType<string | null, string | null, string>;
+}
+
+export type SelectChat = Selectable<ChatTable>;
+export type CreateChat = Insertable<ChatTable>;
+export type UpdateChat = Updateable<ChatTable>;
+
+interface ChatMessageTable {
+  id: ColumnType<string, string, never>;
+  chat_id: ColumnType<string, string, never>;
+  parent_id: ColumnType<string | null, string | null, string | null>;
+  type: ColumnType<'user' | 'assistant', 'user' | 'assistant', 'user' | 'assistant'>;
+  content: ColumnType<string, string, string>;
+  context_node_ids: JSONColumnType<string[] | null, string[] | null, string[] | null>;
+  citations: JSONColumnType<
+    Array<{
+      sourceId: string;
+      sourceType: 'document' | 'node' | 'record';
+      quote: string;
+      relevanceScore: number;
+    }> | null,
+    string | null,
+    string | null
+  >;
+  provider_used: ColumnType<string | null, string | null, string | null>;
+  model_used: ColumnType<string | null, string | null, string | null>;
+  created_at: ColumnType<Date, Date, never>;
+  created_by: ColumnType<string, string, never>;
+}
+
+export type SelectChatMessage = Selectable<ChatMessageTable>;
+export type CreateChatMessage = Insertable<ChatMessageTable>;
+export type UpdateChatMessage = Updateable<ChatMessageTable>;
+
 export interface DatabaseSchema {
   accounts: AccountTable;
   devices: DeviceTable;
@@ -323,4 +376,6 @@ export interface DatabaseSchema {
   node_embeddings: NodeEmbeddingTable;
   document_embeddings: DocumentEmbeddingTable;
   counters: CounterTable;
+  chats: ChatTable;
+  chat_messages: ChatMessageTable;
 }

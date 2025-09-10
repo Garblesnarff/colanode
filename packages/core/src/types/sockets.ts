@@ -57,11 +57,44 @@ export type UserUpdatedMessage = {
   userId: string;
 };
 
+export type ChatMessageSentMessage = {
+  type: 'chat.message.sent';
+  chatId: string;
+  messageId: string;
+  content: string;
+  senderId: string;
+};
+
+export type ChatResponseStreamingMessage = {
+  type: 'chat.response.streaming';
+  chatId: string;
+  messageId: string;
+  chunk: string;
+  done: boolean;
+};
+
+export type ChatContextUpdatedMessage = {
+  type: 'chat.context.updated';
+  chatId: string;
+  contextNodeIds: string[];
+};
+
+export type ChatProviderChangedMessage = {
+  type: 'chat.provider.changed';
+  chatId: string;
+  provider: string;
+  model: string;
+};
+
 export type Message =
   | AccountUpdatedMessage
   | WorkspaceUpdatedMessage
   | WorkspaceDeletedMessage
   | UserCreatedMessage
   | UserUpdatedMessage
+  | ChatMessageSentMessage
+  | ChatResponseStreamingMessage
+  | ChatContextUpdatedMessage
+  | ChatProviderChangedMessage
   | SynchronizerInputMessage
   | SynchronizerOutputMessage<SynchronizerInput>;

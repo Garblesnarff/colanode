@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 
-export const aiProviderSchema = z.enum(['openai', 'google']);
+export const aiProviderSchema = z.enum(['openai', 'google', 'openrouter']);
 export type AiProvider = z.infer<typeof aiProviderSchema>;
 
 export const aiProviderConfigSchema = z.object({
@@ -49,6 +49,7 @@ export const aiConfigSchema = z.discriminatedUnion('enabled', [
     providers: z.object({
       openai: aiProviderConfigSchema,
       google: aiProviderConfigSchema,
+      openrouter: aiProviderConfigSchema,
     }),
     langfuse: z.object({
       enabled: z.preprocess(
@@ -99,6 +100,10 @@ export const readAiConfigVariables = () => {
       google: {
         apiKey: process.env.GOOGLE_API_KEY,
         enabled: process.env.GOOGLE_ENABLED,
+      },
+      openrouter: {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        enabled: process.env.OPENROUTER_ENABLED,
       },
     },
     langfuse: {

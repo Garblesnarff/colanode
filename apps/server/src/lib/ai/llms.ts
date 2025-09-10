@@ -15,6 +15,7 @@ import {
   chunkSummarizationPrompt,
 } from '@colanode/server/lib/ai/prompts';
 import { config } from '@colanode/server/lib/config';
+import { OpenRouterLLM } from '@colanode/server/lib/ai/providers/openrouter';
 import {
   rerankedDocumentsSchema,
   RerankedDocuments,
@@ -26,7 +27,7 @@ import {
   rewrittenQuerySchema,
 } from '@colanode/server/types/llm';
 
-const getChatModel = (task: string): ChatOpenAI | ChatGoogleGenerativeAI => {
+const getChatModel = (task: string): ChatOpenAI | ChatGoogleGenerativeAI | OpenRouterLLM => {
   if (!config.ai.enabled) {
     throw new Error('AI is disabled.');
   }
@@ -50,6 +51,12 @@ const getChatModel = (task: string): ChatOpenAI | ChatGoogleGenerativeAI => {
         model: modelConfig.modelName,
         temperature: modelConfig.temperature,
         apiKey: providerConfig.apiKey,
+      });
+    case 'openrouter':
+      return new OpenRouterLLM({
+        apiKey: providerConfig.apiKey,
+        model: modelConfig.modelName,
+        temperature: modelConfig.temperature,
       });
     default:
       throw new Error(`Unsupported AI provider: ${modelConfig.provider}`);

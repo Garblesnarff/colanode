@@ -6,8 +6,10 @@ import {
   SynchronizerInputMessage,
   UserStatus,
   createDebugger,
+  ChatMessageSentMessage,
 } from '@colanode/core';
 import { database } from '@colanode/server/data/database';
+import { sendMessageWithStreaming } from '@colanode/server/lib/chats-streaming';
 import { BaseSynchronizer } from '@colanode/server/synchronizers/base';
 import { CollaborationSynchronizer } from '@colanode/server/synchronizers/collaborations';
 import { DocumentUpdateSynchronizer } from '@colanode/server/synchronizers/document-updates';
@@ -90,6 +92,8 @@ export class SocketConnection {
 
     if (message.type === 'synchronizer.input') {
       this.handleSynchronizerInput(message);
+    } else if (message.type === 'chat.message.sent') {
+      this.handleChatMessageSent(message);
     }
   }
 
@@ -379,5 +383,62 @@ export class SocketConnection {
       accountId: event.accountId,
       userId: event.userId,
     });
+  }
+
+  private async handleChatMessageSent(message: ChatMessageSentMessage) {
+    try {
+      // Validate that the sender has access to this chat
+      const chat = await database
+        .selectFrom('chats')
+        .where('id', '=', message.chatId)
+        .selectAll()
+        .executeTakeFirst();
+
+      if (!chat) {
+        return;
+      }
+
+      // Check if sender has access to the workspace
+      const user = await database
+        .selectFrom('users')
+        .where('id', '=', message.senderId)
+        .where('workspace_id', '=', chat.workspace_id)
+        .where('account_id', '=', this.context.accountId)
+        .executeTakeFirst();
+
+      if (!user) {
+        return;
+      }
+
+      // Process the message with streaming response
+      await sendMessageWithStreaming(
+        {
+          chatId: message.chatId,
+          content: message.content,
+          userId: message.senderId,
+        },
+        (chunk: string, done: boolean) => {
+          // Send streaming chunks to the client
+          this.sendMessage({
+            type: 'chat.response.streaming',
+            chatId: message.chatId,
+            messageId: message.messageId,
+            chunk,
+            done,
+          });
+        }
+      );
+    } catch (error) {
+      console.error('Error handling chat message:', error);
+      
+      // Send error response
+      this.sendMessage({
+        type: 'chat.response.streaming',
+        chatId: message.chatId,
+        messageId: message.messageId,
+        chunk: 'Sorry, I encountered an error while processing your request.',
+        done: true,
+      });
+    }
   }
 }
